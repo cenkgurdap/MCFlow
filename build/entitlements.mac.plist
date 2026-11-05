@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for the hardened runtime. See the `mac:` block in
+  `electron-builder.yml` for why the hardened runtime is on at all.
+
+  These are the minimum an Electron app needs to launch under it, and no more.
+  Every one of them re-permits something the hardened runtime forbids by default
+  because V8 needs it:
+
+    allow-jit                          V8 maps pages writable and then
+    allow-unsigned-executable-memory   executable to run compiled JavaScript.
+                                       Without both, the renderer dies on the
+                                       first script — the failure mode is a
+                                       window that opens white and closes.
+
+    allow-dyld-environment-variables   Electron's own launcher sets DYLD_* to
+                                       find the framework inside the bundle.
+
+    disable-library-validation         The bundle loads its own unsigned
+                                       helpers and native modules, which
+                                       library validation would refuse because
+                                       they are not signed by the same team.
+
+  Deliberately absent: camera, microphone, location, address book, and the app
+  sandbox. MCFlow reads .fcs files the user picks and writes files the user
+  names, and asking for anything beyond that would be a permission prompt with
+  no honest answer behind it. `com.apple.security.files.user-selected.read-write`
+  is not here either — it is a *sandbox* entitlement, and this app is not
+  sandboxed; adding it outside the sandbox grants nothing and misreports intent.
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+  </dict>
+</plist>

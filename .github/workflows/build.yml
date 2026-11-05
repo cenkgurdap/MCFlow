@@ -1,0 +1,162 @@
+# Build the installers for every platform MCFlow ships on, and attach them to
+# the release.
+#
+# ## Why a tag rather than a push to main
+#
+# A release here is a deliberate act, not a consequence of merging: the release
+# checklist — tests passing, an end-to-end check, the documentation accurate —
+# has to be true *before* the version is bumped, and only a person can say it is.
+# Building on every push would produce a stream of installers nobody had decided
+# to ship, and would make the version in `package.json` a thing that had to be
+# guarded rather than simply bumped. So: tag `v0.16.0`, push the tag, get two
+# platforms' artefacts on one release page.
+#
+# `workflow_dispatch` is there for the other half of that — running the matrix
+# against a branch to find out whether it *would* build, without publishing
+# anything. Nothing is uploaded on that path.
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # the release upload needs it; nothing else here writes
+
+jobs:
+  build:
+    strategy:
+      # Windows failing must not cancel macOS half way through. Two platforms
+      # take different times and fail for unrelated reasons, and the useful
+      # outcome of a broken build is knowing which one broke.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            # NSIS installer, portable exe, and the blockmap beside them.
+            artifacts: 'release/*.exe'
+          - os: macos-latest
+            platform: mac
+            # Both architectures, both formats — see the `mac:` target list in
+            # electron-builder.yml for why the .zip is not redundant.
+            artifacts: |
+              release/*.dmg
+              release/*.zip
+
+    runs-on: ${{ matrix.os }}
+
+    # Every action here runs on **node24**, checked against each one's own
+    # `action.yml` rather than assumed from its version number (2026-08-22).
+    #
+    # The `@v4` line of all three `actions/*` targets node20, which GitHub now
+    # silently runs on node24 anyway and warns about on every job. A warning that
+    # is patched over is a failure with a date on it — when the fallback is
+    # removed the build stops, so the bump happens now, on a green build, rather
+    # than during the next release.
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # **The Node the app is built with**, which is a different question
+          # from the runtime the actions above use. 24 is the current Active LTS
+          # (22 has moved to maintenance) and it is what this project is
+          # developed and verified on locally, so CI and the desk agree.
+          node-version: 24
+          cache: npm
+
+      # `npm ci` rather than `npm install`: the lockfile is the build input, and
+      # a resolver free to pick a newer Electron would make the artefact depend
+      # on the day it was built.
+      - run: npm ci
+
+      # The static gate and the unit tests, before anything is packaged. Both
+      # need no display and no data files.
+      - run: npm run typecheck
+      - run: npm test
+
+      # The icons, which are **not** in the repository.
+      #
+      # `build/icon.*` and `build/installer*.bmp` are gitignored: they are
+      # generated from `Logo.png`, which is tracked, and `build/icon.source.txt`
+      # is the committed receipt naming the SHA-256 they were cut from. So a
+      # fresh checkout has the artwork and none of the renderings, and packaging
+      # without this step produces an installer wearing Electron's default icon.
+      #
+      # It draws in a real offscreen BrowserWindow — fine on both runners here,
+      # and the reason a Linux entry would need xvfb.
+      - run: npm run icon
+
+      # `npm run build` runs typecheck again, which is cheap and keeps the local
+      # command and the CI command identical rather than nearly identical.
+      - run: npm run build
+      - run: npm run build:electron
+
+      # electron-builder for this runner's platform only. Not `-mwl`: a Windows
+      # runner cannot make a .dmg (hdiutil is macOS's) and a mac runner makes a
+      # worse NSIS installer than a Windows one, which is the whole reason this
+      # is a matrix rather than one job.
+      - run: npx electron-builder --${{ matrix.platform }} --publish never
+        env:
+          # electron-builder reads this to attach to a GitHub release itself.
+          # It is left unset on purpose — `--publish never` above, and the upload
+          # is the explicit step below, so the artefacts can be inspected on a
+          # `workflow_dispatch` run without anything being published.
+          GH_TOKEN: ''
+
+      # **Only on a `workflow_dispatch` run**, where the artefact is the entire
+      # output: the installers are downloadable from the run page for 14 days and
+      # nothing else keeps them.
+      #
+      # On a tag it would be a second copy of what the release below already
+      # holds, and the two copies are not billed alike. A release asset is free;
+      # a run artefact counts against the 500 MB of Actions storage a private
+      # repository gets, and one release is ~600 MB of installers. So every
+      # tagged build overran the quota on its own, and six of them left 3.6 GB
+      # sitting there until uploads started being refused — which reads as
+      # "GitHub Actions is out of budget" and is nothing to do with minutes: the
+      # same run bills ~36 of the 2 000 free monthly minutes.
+      #
+      # The release is where a tagged build's installers live. This step is for
+      # the runs that produce no release.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          name: MCFlow-${{ matrix.platform }}
+          path: ${{ matrix.artifacts }}
+          retention-days: 14
+          if-no-files-found: error
+
+      # The tag without its `v`, for the notes below: `v0.37.2` -> `0.37.2`.
+      # Bash on both runners — the Windows default is PowerShell.
+      - name: Version
+        id: version
+        shell: bash
+        run: echo "number=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # The release itself. Both jobs target the same tag, so whichever finishes
+      # first creates the release and the other adds to it.
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ matrix.artifacts }}
+          # Draft, so the notes can be written and both platforms' artefacts
+          # checked before anybody downloads either. Publishing is one click.
+          # The notes are the release's own text, with no change notes for
+          # now: the repository carries no changelog either.
+          draft: true
+          body: |
+            **MCFlow ${{ steps.version.outputs.number }}**
+
+            **Downloads**
+            - Windows: `MCFlow-Setup-${{ steps.version.outputs.number }}.exe` or `MCFlow-${{ steps.version.outputs.number }}-portable.exe`
+            - macOS, Apple Silicon: `MCFlow-${{ steps.version.outputs.number }}-arm64.dmg`
+            - macOS, Intel: `MCFlow-${{ steps.version.outputs.number }}-x64.dmg`
+
+            The macOS build is not notarized. See *First launch on macOS* in the README.
+
+            **Included in this version:** FCS import from spectral and conventional cytometers; hierarchical gating; spectral unmixing and compensation from single-stain controls; derived ratiometric parameters and a guided biophysical-analysis workflow with population fitting; statistics with group comparisons; population export to CSV/XLSX; figure export as PDF, SVG, PNG and TIFF.

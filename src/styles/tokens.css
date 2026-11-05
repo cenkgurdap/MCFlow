@@ -1,0 +1,507 @@
+/* ============================================================================
+   MCFlow Design Tokens
+   ----------------------------------------------------------------------------
+   Single source of truth for colour, type, spacing, radii, motion and elevation.
+   Nothing in the app should hard-code a hex value, px font-size, or timing.
+
+   Structure:
+     1. Primitive scales      — raw values, never used directly in components
+     2. Semantic aliases      — what components actually consume (theme-aware)
+     3. Population palette    — reserved exclusively for gates/populations
+     4. Density ramps         — scientific colour maps for 2D density plots
+     5. Type / space / radius / motion / elevation
+   ========================================================================= */
+
+/* ---------------------------------------------------------------------------
+   1. PRIMITIVE SCALES
+   Neutrals are two distinct, hand-tuned ramps rather than one ramp inverted.
+   The dark ramp is cooled slightly (blue-leaning) because it is viewed against
+   emissive plot colour; the light ramp is warmed to avoid a clinical blue cast.
+   ------------------------------------------------------------------------ */
+:root {
+  /* Neutral — dark theme ramp (900 = deepest chrome, 050 = brightest text) */
+  --n-dark-950: #08090b;
+  --n-dark-900: #0d0f13;
+  --n-dark-850: #121419;
+  --n-dark-800: #171a20;
+  --n-dark-750: #1d2028;
+  --n-dark-700: #24282f;
+  --n-dark-600: #313640;
+  --n-dark-500: #454b57;
+  --n-dark-400: #626976;
+  --n-dark-300: #868d9a;
+  --n-dark-200: #a8aeb9;
+  --n-dark-100: #cdd2da;
+  --n-dark-050: #eaecf0;
+
+  /* Neutral — light theme ramp */
+  --n-lite-950: #0c0d0f;
+  --n-lite-900: #1a1c20;
+  --n-lite-800: #2c2f35;
+  --n-lite-700: #434750;
+  --n-lite-600: #5c616c;
+  --n-lite-500: #787d89;
+  --n-lite-400: #9aa0ab;
+  --n-lite-300: #c0c5cd;
+  --n-lite-200: #dcdfe4;
+  --n-lite-100: #ebedf0;
+  --n-lite-050: #f4f5f7;
+  --n-lite-000: #ffffff;
+
+  /* Accent — a single lilac. Used for primary actions, focus rings, and active
+     state ONLY. Never for data.
+
+     It was a cyan-teal (`#16b3c4`) until 2026-08-04. The reference was
+     **#CEA2FD — hsl(269, 96%, 81%)** — and it is `--accent-400`, the value the
+     dark theme puts on text and focus rings, because that is where the colour is
+     actually looked at. The rest of the ramp is the same hue held at 269° with
+     lightness stepped for the job each token does: 500 is the dark theme's
+     primary fill, 600 the light theme's (dark enough to carry white text at
+     5.4:1), 700 the light theme's accent text (8.4:1 on white).
+
+     A single hue rather than a re-tuned one per theme: the whole reason the ramp
+     exists is that "the accent" should be one recognisable colour, and a hue
+     that shifts between themes is two colours with one name. Only the lightness
+     moves.
+
+     **Lightened 2026-08-10.** #CEA2FD read heavy against this chrome, most of
+     all on the fills — `--accent-500` is what a primary button, a selection rail
+     and the segmented-control chip are drawn in, and at 70% lightness it was the
+     darkest thing in a top bar made of hairlines. The three dark-facing steps
+     move **25% of the remaining distance to white in HSL lightness**, hue and
+     saturation held: 300 89→92%, 400 81→86%, 500 70→77.5%.
+
+     Recalculated rather than faded, and the distinction is the point: dropping
+     the opacity of a lilac over `--surface-base` desaturates it toward the grey
+     underneath, which is the "washed out" failure. Holding S and raising L keeps
+     it a lilac — #DAB9FE is hsl(269, 96%, 86%), the same hue to within a tenth
+     of a degree.
+
+     **600 and 700 deliberately do not move.** They are the light theme's fill
+     and accent text and they exist at stated contrast ratios against white; a
+     25% lift would take `--action-primary-bg` under 4.5:1 with white on it. The
+     ramp is asymmetric because the two ends answer to different constraints —
+     one to how a dark UI reads, one to WCAG. */
+  --accent-300: #ead6ff;
+  --accent-400: #dab9fe;
+  --accent-500: #c494f7;
+  --accent-600: #8a45d3;
+  --accent-700: #6925b1;
+
+  /* Status */
+  --status-ok-400: #4ec98a;
+  --status-ok-600: #1f9a5c;
+  --status-warn-400: #e8b04b;
+  --status-warn-600: #b57a1a;
+  --status-err-400: #f2736b;
+  --status-err-600: #c8443b;
+  --status-info-400: #6ba4f0;
+  --status-info-600: #3a6fc4;
+}
+
+/* ---------------------------------------------------------------------------
+   2. SEMANTIC ALIASES
+   Components consume only these. Both themes define the same variable names.
+   ------------------------------------------------------------------------ */
+
+/* Dark is the default: cytometry is routinely done in dimmed rooms and long
+   sessions, and plot colour reads truer against a dark ground. */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces — ascending elevation, not drop shadows */
+  --surface-sunken: var(--n-dark-950);
+  --surface-base: var(--n-dark-900);
+  --surface-raised: var(--n-dark-850);
+  --surface-overlay: var(--n-dark-800);
+  --surface-input: var(--n-dark-850);
+  --surface-hover: rgb(255 255 255 / 0.04);
+  --surface-active: rgb(255 255 255 / 0.07);
+  /* The accent at low alpha — the wash behind a selected row, an active
+     segmented-control chip and a checked swatch. Literal channels rather than
+     `var(--accent-400)`, because a CSS variable cannot carry an alpha into an
+     `rgb()` without `color-mix`, and this is read on every row of a long table.
+     It has to be kept in step with `--accent-400` by hand. */
+  --surface-selected: rgb(218 185 254 / 0.15);
+  /* The same accent, weaker: a row that is part of the current multi-selection
+     but is not the primary. It has to be clearly *more* than `--surface-hover`
+     at 0.04 — the state it was previously confused with — and clearly less than
+     the primary above it, which is what 0.08 buys. Keep in step with the two it
+     sits between. */
+  --surface-selected-weak: rgb(218 185 254 / 0.08);
+
+  /* The plot canvas is its own surface: darker than chrome so data pops */
+  --surface-plot: #0a0c10;
+
+  /* Gate outlines and labels.
+
+     **Ink follows the theme** as of 2026-08-03: near-white here, near-black on
+     the light theme. It was near-black in both, on the reasoning that an outline
+     contrasts with the density map rather than with the paper — which is true of
+     the *outline*, where most of the line lies over data, and false of the
+     *label*, which sits on empty plot above the shape. A near-black label on a
+     #0a0c10 surface is the reported bug: "Live 66.2%" legible over the cloud and
+     gone the moment it clears it.
+
+     The casing is the other half and does not change: a wider, semi-transparent
+     stroke of the opposite lightness behind the ink, so whichever surface the
+     line crosses, one of the two reads. Keep it narrower than the ink — 1px of
+     casing either side of 1.75px of ink is a 53%-casing line, which reads as the
+     pale outline this replaced. */
+  --gate-ink: #f2f5f8;
+  --gate-casing: rgb(4 6 10 / 0.55);
+
+  /* Borders — hairlines, never 2px "boxes" */
+  --border-subtle: rgb(255 255 255 / 0.06);
+  --border-default: rgb(255 255 255 / 0.10);
+  --border-strong: rgb(255 255 255 / 0.16);
+  --border-accent: var(--accent-500);
+
+  /* Text */
+  --text-primary: var(--n-dark-050);
+  --text-secondary: var(--n-dark-200);
+  --text-tertiary: var(--n-dark-300);
+  --text-disabled: var(--n-dark-500);
+  --text-inverse: var(--n-lite-950);
+  --text-accent: var(--accent-400);
+
+  /* Interactive */
+  --action-primary-bg: var(--accent-500);
+  --action-primary-bg-hover: var(--accent-400);
+  /* Near-black in the accent's own hue rather than a neutral: on a lilac fill a
+     neutral black reads as a hole punched in the button. 5.6:1 against
+     --accent-500. */
+  --action-primary-fg: #1e0b33;
+  --action-ghost-fg: var(--text-secondary);
+
+  /* Plot chrome — axes, ticks, gridlines */
+  --plot-axis: rgb(255 255 255 / 0.28);
+  --plot-tick: rgb(255 255 255 / 0.20);
+  --plot-grid: rgb(255 255 255 / 0.045);
+  --plot-label: var(--n-dark-200);
+  --plot-gate-stroke: #ffffff;
+  --plot-dimmed-event: rgb(255 255 255 / 0.14);
+
+  /* Status */
+  --status-ok: var(--status-ok-400);
+  --status-warn: var(--status-warn-400);
+  --status-err: var(--status-err-400);
+  --status-info: var(--status-info-400);
+  --status-ok-bg: rgb(78 201 138 / 0.12);
+  --status-warn-bg: rgb(232 176 75 / 0.12);
+  --status-err-bg: rgb(242 115 107 / 0.12);
+  --status-info-bg: rgb(107 164 240 / 0.12);
+
+  --focus-ring: var(--accent-400);
+  --scrim: rgb(4 5 7 / 0.62);
+
+  /* The selected-plot outline.
+     Its own token, and deliberately not the accent: the accent is on every
+     primary button, every active toolbar toggle and the focused-panel border,
+     so a selection ring drawn in it says "something here is emphasised" rather
+     than "this is selected and Escape will delete it". Orange is used nowhere
+     else in the chrome and sits far from the accent on the hue circle — 24°
+     against the lilac's 269°, and against the teal's 187° before it — so the
+     state reads at a glance across a worksheet of eight plots.
+
+     **It did not move with the accent on 2026-08-04 and must not.** Its entire
+     job is being a different colour from whatever the accent happens to be. */
+  --select-panel: #ff8b3d;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-sunken: var(--n-lite-100);
+  --surface-base: var(--n-lite-050);
+  --surface-raised: var(--n-lite-000);
+  --surface-overlay: var(--n-lite-000);
+  --surface-input: var(--n-lite-000);
+  --surface-hover: rgb(12 13 15 / 0.04);
+  --surface-active: rgb(12 13 15 / 0.07);
+  /* --accent-600's channels, the light theme's accent fill. See the dark
+     theme's note above for why these are literal. */
+  --surface-selected: rgb(138 69 211 / 0.12);
+  /* See the dark theme's note. Proportionally the same step down, against a
+     hover of 0.04 on this theme too. */
+  --surface-selected-weak: rgb(138 69 211 / 0.06);
+
+  --surface-plot: #ffffff;
+
+  /* Black on paper, and the mirror of the dark theme's pair. The casing does
+     almost nothing over white and everything over a dark population core, which
+     is exactly when it is wanted. */
+  --gate-ink: #0b0f16;
+  --gate-casing: rgb(255 255 255 / 0.75);
+
+  --border-subtle: rgb(12 13 15 / 0.07);
+  --border-default: rgb(12 13 15 / 0.13);
+  --border-strong: rgb(12 13 15 / 0.22);
+  --border-accent: var(--accent-600);
+
+  --text-primary: var(--n-lite-950);
+  --text-secondary: var(--n-lite-700);
+  --text-tertiary: var(--n-lite-500);
+  --text-disabled: var(--n-lite-400);
+  --text-inverse: var(--n-lite-000);
+  --text-accent: var(--accent-700);
+
+  --action-primary-bg: var(--accent-600);
+  --action-primary-bg-hover: var(--accent-700);
+  --action-primary-fg: #ffffff;
+  --action-ghost-fg: var(--text-secondary);
+
+  --plot-axis: rgb(12 13 15 / 0.42);
+  --plot-tick: rgb(12 13 15 / 0.32);
+  --plot-grid: rgb(12 13 15 / 0.07);
+  --plot-label: var(--n-lite-700);
+  --plot-gate-stroke: #12141a;
+  --plot-dimmed-event: rgb(12 13 15 / 0.16);
+
+  --status-ok: var(--status-ok-600);
+  --status-warn: var(--status-warn-600);
+  --status-err: var(--status-err-600);
+  --status-info: var(--status-info-600);
+  --status-ok-bg: rgb(31 154 92 / 0.10);
+  --status-warn-bg: rgb(181 122 26 / 0.10);
+  --status-err-bg: rgb(200 68 59 / 0.10);
+  --status-info-bg: rgb(58 111 196 / 0.10);
+
+  /* Darker on a light canvas, for the same reason every other token has a pair:
+     #ff8b3d on white is a pale smear rather than an outline. */
+  --select-panel: #d2540b;
+
+  --focus-ring: var(--accent-600);
+  --scrim: rgb(12 13 15 / 0.38);
+}
+
+/* ---------------------------------------------------------------------------
+   3. POPULATION PALETTE
+   Reserved exclusively for gates/populations so data colour is never confused
+   with UI chrome. 12 hues, ordered so the first 8 stay distinguishable under
+   deuteranopia and protanopia, and all sit at similar perceived lightness so
+   no population looks "more important" than another.
+   Each hue ships a dark-theme and light-theme variant: on a dark canvas the
+   colours are lifted in lightness and slightly desaturated so they don't glow.
+   ------------------------------------------------------------------------ */
+:root,
+:root[data-theme='dark'] {
+  --pop-01: #4cc9f0; /* cyan      */
+  --pop-02: #f2994a; /* amber     */
+  --pop-03: #7ee08b; /* green     */
+  --pop-04: #e879b8; /* pink      */
+  --pop-05: #a78bfa; /* violet    */
+  --pop-06: #ffd166; /* yellow    */
+  --pop-07: #5eead4; /* teal      */
+  --pop-08: #f0736b; /* red       */
+  --pop-09: #93b7ff; /* periwinkle*/
+  --pop-10: #c3e88d; /* lime      */
+  --pop-11: #d9a3ff; /* orchid    */
+  --pop-12: #ffa3a3; /* salmon    */
+}
+
+:root[data-theme='light'] {
+  --pop-01: #0b8bb8;
+  --pop-02: #c96a12;
+  --pop-03: #2c9350;
+  --pop-04: #c04a8c;
+  --pop-05: #6d4bd1;
+  --pop-06: #a67c00;
+  --pop-07: #0a8f80;
+  --pop-08: #c8443b;
+  --pop-09: #3d68c4;
+  --pop-10: #6b8f22;
+  --pop-11: #9a4bc4;
+  --pop-12: #c25555;
+}
+
+/*
+   How one sample's histogram fill combines with the one under it.
+
+   Overlaid distributions are translucent fills stacked on one canvas, and drawn
+   normally the second one hides the first. The blend that fixes that is not the
+   same in both themes, and getting it from a token is what stops it being right
+   in one of them: `screen` lightens towards white, which separates curves on a
+   dark canvas and erases them completely on a white one — every channel
+   saturates and the fill becomes the background.
+
+   That is not hypothetical. The application began opening light, and a six-tube
+   overlay then drew one visible curve: the panel's own sample, which is the only
+   series that carries no blend. The other five were in the DOM at full height,
+   in their right colours and their right places, and painted white on white —
+   including in an exported figure, where the background is white by definition.
+
+   `multiply` is the mirror of `screen`: it darkens towards black, so on a light
+   canvas each fill deepens the one beneath it and the curves separate the same
+   way round.
+*/
+:root,
+:root[data-theme='dark'] {
+  --histogram-overlay-blend: screen;
+}
+
+:root[data-theme='light'] {
+  --histogram-overlay-blend: multiply;
+}
+
+/* ---------------------------------------------------------------------------
+   4. DENSITY RAMPS
+   For 2D density/heatmap plots. Two, and each is a reference ramp rather than a
+   house design — Abyss, Ember and Glacier are removed, because the value of a
+   density ramp is being *the* rainbow or *the* viridis, which is what an
+   operator is comparing this app's plot against.
+
+   Flame's tokens are gone with the ramp (2026-08-03). Its bottom third sat
+   within a few units of --surface-plot (#0a0c10), which is where the sparse
+   periphery of every plot lands and where gating is done; matching FCS
+   Express's screen did not outrank seeing the events being gated on. See
+   src/render/ramps.ts.
+
+   Every one of these is sampled at seven even points from the table the renderer
+   actually uses (src/render/ramps.ts, src/render/viridis.ts). They exist only to
+   draw a CSS swatch. **Do not hand-tune them** — they would then disagree with
+   the rendered plot, which is what happened to the picker before it started
+   building its gradient from the ramp itself.
+   ------------------------------------------------------------------------ */
+:root {
+  /* Rainbow — the default. A spectral ramp, deliberately NOT monotonic in lightness: yellow is
+     lighter than the red above it. Kept because hue separation through the
+     mid-range is what finding the edge of a population wants, and because a great
+     many published figures use it.
+
+     Off the gamut corners on purpose — these are ~15% toward the neutral of their
+     own lightness, and the top end is held under 85% value. The saturated form
+     (#0000ff, #00ffff, #00ff00, #ffff00, #ff0000) left a gate outline and a
+     cursor readout nothing to sit against. */
+  --ramp-rainbow-0: #101f52;
+  --ramp-rainbow-1: #2c50cf;
+  --ramp-rainbow-2: #3ec8d2;
+  --ramp-rainbow-3: #4fc45f;
+  --ramp-rainbow-4: #b9d158;
+  --ramp-rainbow-5: #e79340;
+  --ramp-rainbow-6: #d94f43;
+
+  /* Viridis — the only ramp here that is genuinely perceptually uniform, from
+     matplotlib's own 256-entry LUT. The right choice when the reading is
+     quantitative. */
+  --ramp-viridis-0: #440154;
+  --ramp-viridis-1: #443983;
+  --ramp-viridis-2: #31688e;
+  --ramp-viridis-3: #21918c;
+  --ramp-viridis-4: #35b779;
+  --ramp-viridis-5: #8ed645;
+  --ramp-viridis-6: #fde725;
+}
+
+/* ---------------------------------------------------------------------------
+   5. TYPE / SPACE / RADIUS / MOTION / ELEVATION
+   ------------------------------------------------------------------------ */
+:root {
+  /* Font families — three roles, and the third one is not a style choice.
+
+     `--font-ui` is Inter, everywhere.
+
+     `--font-mono` is JetBrains Mono, and it is for *identifiers*: detector
+     names, equations, file paths, raw keywords. There a disambiguated zero is
+     the point — `B10-A` must not be readable as `B1O-A`.
+
+     `--font-numeric` is what a **measurement** is set in, and it is Inter
+     rather than the mono face. Every monospace family in circulation draws its
+     zero with a dot or a slash through it — measured off the shipped fonts,
+     JetBrains Mono, Roboto Mono, IBM Plex Mono, Noto Sans Mono, Geist Mono and
+     Cousine all give the `0` glyph three contours where a plain zero has two —
+     and at the 10-11 px these tables are set in, a dotted zero reads as an 8.
+     That was reported against the similarity matrix, where every cell is
+     `1.000` or `0.0xx`, and against `10 / 10` on the Compute step.
+
+     Inter's zero is plain (two contours) and its `tnum` figures are tabular, so
+     a column still aligns — which was the only thing the mono face was buying
+     here. `.tnum` in `global.css` is what applies it. */
+  --font-ui: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace,
+    'SF Mono', 'Cascadia Mono', 'Consolas', monospace;
+  --font-numeric: var(--font-ui);
+
+  /* Type scale — a deliberate 7-step ramp, not ad hoc sizes.
+     Ratio ~1.16 in the body range so dense UI stays legible without jumps. */
+  --text-2xs: 0.6875rem; /* 11px — dense table meta, axis ticks       */
+  --text-xs: 0.75rem;    /* 12px — secondary labels, sidebar items    */
+  --text-sm: 0.8125rem;  /* 13px — DEFAULT UI SIZE                    */
+  --text-base: 0.875rem; /* 14px — body copy, panel content           */
+  --text-md: 1rem;       /* 16px — section headings                   */
+  --text-lg: 1.25rem;    /* 20px — panel titles                       */
+  --text-xl: 1.625rem;   /* 26px — screen titles, empty-state heads   */
+  --text-2xl: 2.125rem;  /* 34px — hero numerals                      */
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Optical tightening: large text needs negative tracking to look right */
+  --tracking-tight: -0.018em;
+  --tracking-snug: -0.008em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;  /* small caps / overline labels */
+
+  /* Spacing — strict 4px grid */
+  --space-0: 0;
+  --space-1: 0.25rem; /*  4 */
+  --space-2: 0.5rem;  /*  8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem;    /* 16 */
+  --space-5: 1.25rem; /* 20 */
+  --space-6: 1.5rem;  /* 24 */
+  --space-8: 2rem;    /* 32 */
+  --space-10: 2.5rem; /* 40 */
+  --space-12: 3rem;   /* 48 */
+  --space-16: 4rem;   /* 64 */
+
+  /* Radii — small and consistent. No pill-shaped buttons, no 16px cards. */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  /* Motion. Short, eased, and purposeful — motion signals state change.
+     Standard easing is a gentle out-curve; "emphasis" is used only where
+     something enters the screen. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-instant: 70ms;
+  --dur-fast: 130ms;
+  --dur-normal: 200ms;
+  --dur-slow: 320ms;
+
+  /* Elevation. Deliberately minimal — depth comes from surface steps and
+     hairline borders, not from shadow stacks. Shadows only for true overlays
+     (menus, dialogs, drag previews). */
+  --shadow-overlay: 0 6px 22px -6px rgb(0 0 0 / 0.44),
+    0 2px 6px -2px rgb(0 0 0 / 0.3);
+  --shadow-drag: 0 12px 34px -8px rgb(0 0 0 / 0.5);
+
+  /* Fixed chrome dimensions, so panels line up across the app */
+  --h-topbar: 44px;
+  --h-statusbar: 26px;
+  --h-row: 28px;
+  --h-control: 28px;
+  --h-control-lg: 32px;
+  --w-sidebar: 264px;
+  --w-inspector: 296px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast: 0ms;
+    --dur-normal: 0ms;
+    --dur-slow: 0ms;
+  }
+}

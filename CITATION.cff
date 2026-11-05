@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use MCFlow, please cite it as below."
+title: MCFlow
+type: software
+authors:
+  - family-names: Gurdap
+    given-names: Cenk
+version: 0.35.0
+date-released: 2026-10-26
+license: MIT
+repository-code: "https://github.com/cenkgurdap/MCFlow"
+abstract: >-
+  Desktop software for analysing conventional and spectral flow cytometry
+  data, with biophysical readouts such as membrane order computed from
+  ratiometric probes.
+keywords:
+  - flow cytometry
+  - spectral flow cytometry
+  - spectral unmixing
+  - compensation
+  - membrane order

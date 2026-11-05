@@ -1,0 +1,54 @@
+{
+  "name": "mcflow",
+  "version": "0.37.3",
+  "private": true,
+  "description": "Flow cytometry analysis for conventional and spectral platforms",
+  "author": "Cenk Gurdap",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cenkgurdap/MCFlow.git"
+  },
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "build:electron": "node scripts/build-electron.mjs",
+    "electron": "npm run build && npm run build:electron && electron dist-electron/main.js",
+    "icon": "electron scripts/make-icon.mjs",
+    "package": "npm run build && npm run build:electron && electron-builder --win",
+    "package:dir": "npm run build && npm run build:electron && electron-builder --win --dir",
+    "package:mac": "npm run build && npm run build:electron && electron-builder --mac",
+    "package:linux": "npm run build && npm run build:electron && electron-builder --linux"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.1.1",
+    "@fontsource-variable/jetbrains-mono": "^5.1.2",
+    "lucide-react": "^0.469.0",
+    "ml-matrix": "^6.12.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "umap-js": "^1.4.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.4",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.3.1",
+    "electron-builder": "^26.15.3",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^2.1.8"
+  }
+}

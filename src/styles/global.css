@@ -1,0 +1,364 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import './tokens.css';
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Bridge design tokens into Tailwind's utility namespace.
+   `inline` keeps the var() reference in the generated utility, so switching
+   [data-theme] re-themes every utility at once with no class swapping.
+   ------------------------------------------------------------------------ */
+/* NOTE ON NAMING: every surface colour is namespaced `surface-*`. A bare
+   `--color-base` would register a colour named `base`, which Tailwind then
+   resolves ahead of the built-in `text-base` FONT SIZE — silently turning
+   every `text-base` in the app into a colour utility. Keep colour names clear
+   of the size scale (base/sm/md/lg/xl). */
+@theme inline {
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-input: var(--surface-input);
+  --color-surface-plot: var(--surface-plot);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-selected: var(--surface-selected);
+
+  --color-line-subtle: var(--border-subtle);
+  --color-line: var(--border-default);
+  --color-line-strong: var(--border-strong);
+  --color-line-accent: var(--border-accent);
+
+  --color-fg: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-tertiary: var(--text-tertiary);
+  --color-fg-disabled: var(--text-disabled);
+  --color-fg-inverse: var(--text-inverse);
+  --color-fg-accent: var(--text-accent);
+
+  --color-accent: var(--accent-500);
+  --color-accent-hover: var(--accent-400);
+  --color-on-accent: var(--action-primary-fg);
+
+  --color-ok: var(--status-ok);
+  --color-warn: var(--status-warn);
+  --color-err: var(--status-err);
+  --color-info: var(--status-info);
+  --color-ok-bg: var(--status-ok-bg);
+  --color-warn-bg: var(--status-warn-bg);
+  --color-err-bg: var(--status-err-bg);
+  --color-info-bg: var(--status-info-bg);
+
+  --color-pop-01: var(--pop-01);
+  --color-pop-02: var(--pop-02);
+  --color-pop-03: var(--pop-03);
+  --color-pop-04: var(--pop-04);
+  --color-pop-05: var(--pop-05);
+  --color-pop-06: var(--pop-06);
+  --color-pop-07: var(--pop-07);
+  --color-pop-08: var(--pop-08);
+  --color-pop-09: var(--pop-09);
+  --color-pop-10: var(--pop-10);
+  --color-pop-11: var(--pop-11);
+  --color-pop-12: var(--pop-12);
+
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono);
+
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --ease-standard: var(--ease-standard);
+  --ease-emphasis: var(--ease-emphasis);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   ------------------------------------------------------------------------ */
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden; /* the app manages its own scroll regions */
+  }
+
+  body {
+    margin: 0;
+    background: var(--surface-base);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-snug);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv05' 1, 'cv08' 1, 'ss03' 1; /* Inter: single-storey a-alt off, better l, rounded quotes */
+  }
+
+  /* Numerals in data contexts must be tabular so columns align.
+
+     `'zero' 1` used to be here and is gone. It asks for the *slashed* zero, and
+     between the two faces it reached it did nothing useful either way: the
+     bundled JetBrains Mono ships no `zero` feature at all, so its zero stayed
+     the dotted default, and where the rule landed on Inter it turned a plain
+     zero into a slashed one. Both are the glyph the report was about. */
+  table,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  ::selection {
+    background: var(--accent-500);
+    color: var(--action-primary-fg);
+  }
+
+  /* One focus treatment everywhere. Visible, but not a browser default halo. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+    border-radius: var(--radius-xs);
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+
+  /* Scrollbars, restyled — the OS default is the single loudest "unfinished
+     app" signal in a dense IDE-style layout. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border-default);
+    border-radius: var(--radius-full);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--border-strong);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Utilities used often enough to earn a name
+   ------------------------------------------------------------------------ */
+@layer utilities {
+  /*
+     A measured number.
+
+     Tabular, so a column of them aligns, and set in `--font-numeric` — Inter —
+     rather than in whatever family the element already carries. See the token
+     for why: every monospace face draws its zero with a dot or a slash, and at
+     10 px that reads as an 8. The similarity matrix is a grid of `1.000` and
+     `0.0xx` and was the report.
+
+     It has to live in the utilities layer, after Tailwind's own, because most
+     call sites read `font-mono tnum` and a rule in `@layer base` would lose to
+     the `font-mono` utility. Those call sites are left as they are on purpose:
+     `tnum` is the marker for "this is a measurement", it is already on every
+     one of them, and moving forty of them to a new class name would be the same
+     change with more to go wrong.
+  */
+  .tnum {
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* Eyebrow label — small, spaced, uppercase. Used for panel section headers so
+     they read as structure rather than content.
+     NOT named `.overline`: Tailwind ships an `overline` utility that sets
+     text-decoration-line, which would draw a stray rule above every heading. */
+  .eyebrow {
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
+  /* A hairline that respects the surface it sits on */
+  .hairline-t {
+    border-top: 1px solid var(--border-subtle);
+  }
+  .hairline-b {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .hairline-l {
+    border-left: 1px solid var(--border-subtle);
+  }
+  .hairline-r {
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion primitives
+   ------------------------------------------------------------------------ */
+@keyframes mc-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes mc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mc-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mc-shimmer {
+  from {
+    background-position: -180% 0;
+  }
+  to {
+    background-position: 180% 0;
+  }
+}
+@keyframes mc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * Confirmation that a new population landed in the tree.
+ *
+ * A gate finalises on a single click somewhere else entirely — on the plot —
+ * so without this the tree just silently gains a row and the user is left
+ * wondering whether the click took. Two beats rather than one: a single fade
+ * is easy to miss when the eye is still on the cursor.
+ */
+@keyframes mc-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  15%,
+  55% {
+    background-color: color-mix(in srgb, var(--accent-500) 30%, transparent);
+  }
+  35% {
+    background-color: color-mix(in srgb, var(--accent-500) 8%, transparent);
+  }
+}
+
+.anim-flash {
+  animation: mc-flash 1100ms var(--ease-standard);
+}
+
+/*
+ * A plot arriving in the layout.
+ *
+ * Deliberately not a spring: a panel that overshoots and settles draws the eye
+ * to the motion instead of to the plot that just appeared, and with a batch drop
+ * of three replicates the bouncing compounds. This states "something arrived
+ * here" and gets out of the way — a short rise with a barely-perceptible scale,
+ * on the standard easing curve everything else in the app uses.
+ */
+@keyframes mc-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.anim-panel-in {
+  animation: mc-panel-in var(--dur-normal) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-flash {
+    animation-duration: 1ms;
+  }
+  .anim-panel-in {
+    animation-duration: 1ms;
+  }
+}
+
+.anim-fade {
+  animation: mc-fade-in var(--dur-normal) var(--ease-standard);
+}
+.anim-rise {
+  animation: mc-rise var(--dur-normal) var(--ease-emphasis);
+}
+.anim-scale {
+  animation: mc-scale-in var(--dur-fast) var(--ease-emphasis);
+}
+
+/* Loading skeleton — a sweep, not a pulse. Pulsing reads as an error state. */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised) 0%,
+    var(--surface-overlay) 45%,
+    var(--surface-raised) 90%
+  );
+  background-size: 220% 100%;
+  animation: mc-shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}

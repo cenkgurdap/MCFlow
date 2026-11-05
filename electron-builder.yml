@@ -1,0 +1,187 @@
+appId: com.mcflow.app
+productName: MCFlow
+copyright: Copyright © 2026 Cenk Gurdap
+
+directories:
+  output: release
+  buildResources: build
+
+# Only the built output ships — source and tests stay out of the installer.
+#
+# `build/icon.png` is in the list because `createWindow` names it as the
+# BrowserWindow icon and resolves it relative to `dist-electron/`, so it has to
+# be inside the asar. `buildResources` above is where electron-builder *reads*
+# the icon from to stamp the executable and the installer; that is a different
+# job and does not put the file in the app.
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - build/icon.png
+  - package.json
+  - '!**/*.map'
+
+# asar keeps the app a single archive, which makes startup faster and stops
+# casual tampering with the bundle.
+asar: true
+
+win:
+  icon: build/icon.ico
+  target:
+    # NSIS is the familiar double-click installer; portable is a single .exe
+    # that runs from a USB stick with no admin rights, which matters in labs
+    # where users cannot install software.
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: MCFlow
+  artifactName: MCFlow-Setup-${version}.${ext}
+  # Leave analysis files behind on uninstall — a workspace is the user's work.
+  deleteAppDataOnUninstall: false
+
+portable:
+  artifactName: MCFlow-${version}-portable.${ext}
+
+# macOS.
+#
+# `npm run package:mac`, and it **must be run on a Mac** — a .dmg is built with
+# macOS's own `hdiutil` and there is no cross-platform substitute, so this
+# section is configuration that a Windows or Linux machine cannot execute.
+#
+# ## Signing, and what "unsigned" costs
+#
+# `identity: null` asks electron-builder for an **ad-hoc signature** rather than
+# a real one. That is deliberate and it is not the same as skipping signing:
+# an ad-hoc signature is what makes the app launch at all on Apple Silicon,
+# where an unsigned arm64 binary is refused outright by the kernel rather than
+# merely warned about. What it does not do is satisfy Gatekeeper, which wants a
+# Developer ID certificate and a notarisation ticket from Apple — neither of
+# which can be generated without an active Apple Developer Program membership.
+#
+# So the first launch of a build produced this way shows "MCFlow cannot be
+# opened because the developer cannot be verified", and the way past it is
+# right-click ▸ Open (or `xattr -dr com.apple.quarantine /Applications/MCFlow.app`).
+# That is stated in the release notes rather than left to be discovered.
+#
+# To make it Gatekeeper-clean later, nothing here has to be restructured: set
+# `identity` to the Developer ID Application certificate and add `notarize` with
+# an App Store Connect API key. The hardened runtime and its entitlements are
+# already on, so notarisation has nothing left to ask for. The two arch entries
+# below already produce the pair Apple asks for.
+mac:
+  icon: build/icon.icns
+  category: public.app-category.productivity
+  identity: null
+  # On, and with entitlements, even though this build is ad-hoc signed.
+  #
+  # The hardened runtime is a notarisation *requirement*, so it has to be correct
+  # before a certificate is worth buying — and it is the one setting that cannot
+  # be flipped at the last minute, because turning it on is what makes an
+  # Electron app crash on launch unless the two JIT entitlements below are
+  # granted. V8 writes machine code and maps it executable; the hardened runtime
+  # forbids exactly that by default. Discovering it here, where the fix is a
+  # plist, is the whole reason it is on now rather than on the day a Developer ID
+  # arrives.
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # `spctl --assess` is Gatekeeper's own verdict, and an ad-hoc signature fails
+  # it by definition. Left on, electron-builder treats that failure as a build
+  # error — so the build cannot succeed until the day it is notarised, which is
+  # not a useful thing for it to insist on.
+  gatekeeperAssess: false
+  notarize: false
+  # Why MCFlow reads files in the folders macOS guards (2026-10-28).
+  #
+  # A workspace re-reads its .fcs files by path, without a file dialog, and on
+  # macOS a path under Desktop, Documents, Downloads or a removable or network
+  # volume is behind a privacy prompt that only a file *picked in a dialog*
+  # skips. These are the sentences that prompt shows; without them the read
+  # can be refused outright and a reopened workspace finds none of its data.
+  # The refusal is now reported by name either way (`reportRestore`).
+  extendInfo:
+    NSDesktopFolderUsageDescription: MCFlow re-reads the data files a saved workspace was built from.
+    NSDocumentsFolderUsageDescription: MCFlow re-reads the data files a saved workspace was built from.
+    NSDownloadsFolderUsageDescription: MCFlow re-reads the data files a saved workspace was built from.
+    NSRemovableVolumesUsageDescription: MCFlow re-reads the data files a saved workspace was built from.
+    NSNetworkVolumesUsageDescription: MCFlow re-reads the data files a saved workspace was built from.
+  darkModeSupport: true
+  target:
+    # Both architectures as separate images rather than one universal binary:
+    # a universal build is two Electron runtimes in one file, so the download is
+    # ~170 MB for a machine that can only run half of it.
+    #
+    # `zip` beside `dmg` because the two are not alternatives. The .dmg is the
+    # download a person installs from; the .zip is the shape every automated
+    # consumer wants — CI artefacts, `brew install --cask`, and Squirrel.Mac,
+    # which is the only format Electron's own updater reads.
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+
+  # macOS's copy of the associations below, restated rather than inherited.
+  #
+  # electron-builder resolves a platform section's `fileAssociations` in place of
+  # the top-level one rather than merging with it, and the two platforms cannot
+  # share a block: the icon has to be an `.icns` here and an `.ico` there. Same
+  # two extensions, same roles — `role` is macOS's own field and is what puts
+  # MCFlow in Finder's *Open With* for a `.mcflow` as an editor and for a `.fcs`
+  # as a viewer.
+  fileAssociations:
+    - ext: mcflow
+      name: MCFlow Workspace
+      description: MCFlow analysis workspace
+      icon: build/icon.icns
+      role: Editor
+    - ext: fcs
+      name: Flow Cytometry Standard
+      description: Flow cytometry data file
+      icon: build/icon.icns
+      role: Viewer
+
+dmg:
+  artifactName: MCFlow-${version}-${arch}.${ext}
+  # The conventional two-icon window: the app on the left, /Applications on the
+  # right, so the install gesture is a drag with no instructions.
+  contents:
+    - x: 140
+      y: 200
+      type: file
+    - x: 400
+      y: 200
+      type: link
+      path: /Applications
+
+linux:
+  icon: build/icon.png
+  category: Science
+  target:
+    - AppImage
+    - deb
+
+# Both file types open in MCFlow once it is installed.
+#
+# `.mcflow` is the one that matters here. A workspace saved as `.fcws.json` was
+# claimed by whatever the machine opens JSON with, so double-clicking a saved
+# analysis produced a wall of text in an editor rather than the application that
+# wrote it. The extension is what tells the OS who owns a file, and `.json` says
+# "anything".
+fileAssociations:
+  - ext: mcflow
+    name: MCFlow Workspace
+    description: MCFlow analysis workspace
+    icon: build/icon.ico
+    role: Editor
+  - ext: fcs
+    name: Flow Cytometry Standard
+    description: Flow cytometry data file
+    icon: build/icon.ico
+    role: Viewer

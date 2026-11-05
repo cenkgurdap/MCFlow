@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: blob: data:; worker-src 'self' blob:"
+    />
+    <title>MCFlow</title>
+    <!--
+      The splash lives in the document rather than in the app.
+
+      What it covers is the gap between the window appearing and React's first
+      paint: the bundle is ~560 kB, and parsing it plus mounting the shell is
+      long enough to read as a blank window rather than as a program starting.
+      Anything written in React is by definition unavailable during exactly that
+      window, so this is plain markup and inline CSS, on screen with the first
+      frame, and `main.tsx` removes it once there is something behind it.
+
+      `splash.webp` comes from `public/`, which ships verbatim, so the browser
+      requests it alongside the document instead of after the bundle has run.
+      `npm run icon` cuts it from `LogoSplash.png` — the lockup exported on
+      transparency, which is a **second artwork rather than the icon one
+      reused**. An icon needs the white plate to have a shape in a taskbar; this
+      surface needs it gone, and neither can be derived from the other. WebP
+      because the artwork is tens of thousands of individually antialiased dots,
+      which is PNG's worst case at over a megabyte, *and* it has to carry an
+      alpha channel, which is the one thing the JPEG here before it could not.
+
+      **How long it stays** is decided in `main.tsx`, not here, and it is not
+      simply "until React is ready" any more: a window launched by the
+      application holds it for a minimum of five seconds so the mark is actually
+      seen. See `MIN_SPLASH_MS` there for why that is opt-in per window rather
+      than unconditional.
+
+      **The splash is dark in both themes, and that is not a theme bug**
+      (2026-08-29). The app opens light and stays light — that invariant is
+      untouched — but start-up is a brand moment rather than a working surface,
+      and the mark is drawn in purples chosen to sit on a near-black field. It
+      is deliberately not wired to `data-theme`: a dark-theme user gets a
+      seamless hand-over and a light-theme user gets a 320 ms fade to the app.
+
+      **It is one full-bleed screen, not a card floating in one** (2026-08-21).
+      This was a 360 px image of dark artwork *on white*, rounded and shadowed
+      so that its own white background would read as a deliberate card. It read
+      as an unstyled placeholder instead. The mark is now bounded by the grid
+      row it sits in rather than by a typed width, so it fills whatever window
+      it opens in, and the progress strip sits at the bottom of the **window**
+      rather than in a gap under the artwork.
+
+      The `BrowserWindow` background stays on the *light* surface and is
+      deliberately not matched to this. The window is created `show: false` and
+      shown on `ready-to-show`, so what fills it at launch is this element's
+      first paint, not that colour; what that colour actually fills is the
+      region a resize exposes before the compositor catches up, which happens
+      long after the splash has gone. Matching it to the splash would buy
+      nothing and put a dark band along the edge of every window drag.
+    -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        /* Two rows, not one centred stack: "loading at the bottom" is a
+           position in the window, and a gap under the artwork is not that. The
+           mark takes everything the strip does not. */
+        display: grid;
+        /* minmax(0,…) rather than a bare 1fr: a grid track auto-sizes to its
+           min-content floor first, so a bare 1fr *grows* to whatever the mark
+           needs and the strip below it is pushed off the bottom of the window.
+           The explicit zero minimum is what makes the row a bound. */
+        grid-template-rows: minmax(0, 1fr) auto;
+        /* `--n-dark-900`, the dark theme's `--surface-base`. Literal for the
+           same reason the accent below is — see the note above. */
+        background: #0d0f13;
+        /* 320 ms rather than 240: this fades a near-black field off a near-white
+           application, and the shorter cross-fade read as a cut. */
+        transition: opacity 320ms ease-out;
+      }
+      #splash[data-leaving='1'] { opacity: 0; }
+      #splash figure {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        /* A grid item is min-content-sized by default, which an image this
+           large simply overflows. The override is what lets the `1fr` above
+           actually bound it. */
+        min-height: 0;
+        padding: 3vh 6vw 0;
+      }
+      #splash img {
+        display: block;
+        /* Full-bleed, and sized in vh so the bound is *definite*.
+
+           The obvious spelling — bounded by the grid row, max-height: 100% — is
+           the one that does not work: a percentage max-height against a track
+           whose height the content is still deciding resolves to none, so the
+           px ceiling won on its own and the mark overran the strip below it.
+           A viewport unit is definite everywhere and needs no cycle to resolve.
+           The px ceiling stays as a second bound because 906 px of ink is all
+           the artwork has, and past about 1.5x that the wordmark goes soft.
+
+           No width: the ratio comes from the file, so this is one number to
+           tune and the mark keeps its own proportions in every window. */
+        height: min(74vh, 900px);
+        max-width: 88vw;
+        width: auto;
+      }
+      #splash footer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 3vh 0 min(7vh, 72px);
+      }
+      #splash p {
+        margin: 0;
+        font: 500 12px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        /* --n-dark-300, the dark theme's --text-tertiary. */
+        color: #868d9a;
+      }
+      #splash span {
+        display: block;
+        width: min(260px, 44vw);
+        height: 2px;
+        border-radius: 2px;
+        /* --n-dark-750, so the track reads as a groove rather than as a bar. */
+        background: #1d2028;
+        overflow: hidden;
+        position: relative;
+      }
+      #splash span::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        width: 40%;
+        border-radius: 2px;
+        /* --accent-400. Literal because this markup is deliberately outside the
+           stylesheet — see the note above — so it has to be kept in step with
+           `tokens.css` by hand, and it had drifted: this read `#cea2fd` while
+           the token has been `#dab9fe`. Exactly the cost that note predicts. */
+        background: #dab9fe;
+        animation: splash-sweep 1.1s ease-in-out infinite;
+      }
+      /* An indeterminate sweep, not a percentage: nothing here knows how far
+         through start-up it is, and a fake percentage is a lie about progress. */
+      @keyframes splash-sweep {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash { transition: none; }
+        #splash span::after { animation: none; width: 100%; opacity: 0.5; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash" role="status" aria-label="MCFlow is starting">
+      <figure>
+        <img src="./splash.webp" alt="MCFlow — flow cytometry software for biophysical analysis" />
+      </figure>
+      <footer>
+        <p>Starting</p>
+        <span></span>
+      </footer>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
