@@ -2,6 +2,9 @@
 
 Desktop software for analysing conventional and spectral flow cytometry data, with biophysical readouts such as membrane order computed from ratiometric probes.
 
+For tutorial:
+https://www.youtube.com/watch?v=rL3dO8vWtso
+
 ## Features
 
 - Reads FCS files from spectral and conventional cytometers.
